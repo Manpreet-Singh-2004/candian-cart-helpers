@@ -21,3 +21,6 @@ conda activate cart_env
 # pip install python-dotenv pymongo
 
 pip freeze > requirements.txt
+
+Download MongoDump from this link
+https://fastdl.mongodb.org/tools/db/mongodb-database-tools-windows-x86_64-100.15.0.zip
