@@ -24,18 +24,22 @@ def products_menu():
         print("\n--- Products Menu ---")
         print("1. Add Products (Random hardcoded data)")
         print("2. Delete Products")
-        print("3. Go Back to Main Menu")
+        print("3. Process CSV Data to Mapped Products")
+        print("4. Go Back to Main Menu")
         
-        choice = input("\nEnter your choice (1-3): ").strip()
+        choice = input("\nEnter your choice (1-4): ").strip()
         
         if choice == '1':
             run_script(os.path.join("products", "AddProducts.py"))
         elif choice == '2':
             run_script(os.path.join("products", "DeleteProducts.py"))
         elif choice == '3':
+            # Added the new CSV processor script here
+            run_script(os.path.join("csvDatatoModel", "convert_to_model.py"))
+        elif choice == '4':
             break
         else:
-            print("\n[!] Invalid choice. Please select 1, 2, or 3.")
+            print("\n[!] Invalid choice. Please select 1, 2, 3, or 4.")
 
 def dbBackup_menu():
     """Sub-menu for database backup options."""
@@ -56,7 +60,6 @@ def dbBackup_menu():
         else:
             print("\n[!] Invalid choice. Please select 1, 2, or 3.")
 
-# Add this function to menu.py
 def customers_menu():
     """Sub-menu for managing customers."""
     while True:
@@ -89,7 +92,6 @@ def orders_menu():
         else:
             print("\n[!] Invalid choice. Please select 1 or 2.")
 
-
 def main():
     """Main CLI menu."""
     while True:
@@ -97,21 +99,24 @@ def main():
         print("1. DB Backup")
         print("2. Manage Products")
         print("3. Manage Customers")
-        print("4. Exit")
+        print("4. Manage Orders")  # Linked the orders menu here!
+        print("5. Exit")
         
-        choice = input("\nEnter your choice (1-4): ").strip()
+        choice = input("\nEnter your choice (1-5): ").strip()
         
         if choice == '1':
-            dbBackup_menu() # Fixed: This now routes to the dbBackup sub-menu
+            dbBackup_menu()
         elif choice == '2':
             products_menu()
         elif choice == '3':
             customers_menu()
         elif choice == '4':
+            orders_menu()
+        elif choice == '5':
             print("\nExiting. Have a great day!")
             sys.exit(0)
         else:
-            print("\n[!] Invalid choice. Please select 1, 2, 3, or 4.")
+            print("\n[!] Invalid choice. Please select 1, 2, 3, 4, or 5.")
 
 if __name__ == "__main__":
     # Ensures the script resolves relative paths correctly by changing 
