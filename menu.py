@@ -73,6 +73,22 @@ def customers_menu():
         else:
             print("\n[!] Invalid choice. Please select 1 or 2.")
 
+def orders_menu():
+    """Sub-menu for managing orders."""
+    while True:
+        print("\n--- Orders Menu ---")
+        print("1. Delete All Orders")
+        print("2. Go Back to Main Menu")
+        
+        choice = input("\nEnter your choice (1-2): ").strip()
+        
+        if choice == '1':
+            run_script(os.path.join("orders", "DeleteAllOrders.py"))
+        elif choice == '2':
+            break
+        else:
+            print("\n[!] Invalid choice. Please select 1 or 2.")
+
 
 def main():
     """Main CLI menu."""
