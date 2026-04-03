@@ -18,6 +18,8 @@ class ProductData(TypedDict):
     subsidised: bool
     isFeatured: bool
     primaryUPC: int
+    UOM: str
+    isMeasuredInWeight: bool
 
 # O(1) Dictionary for fast category mapping
 CATEGORY_MAP: Dict[str, str] = {
@@ -106,7 +108,7 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
     headers: List[str] = [
         "storeId", "name", "description", "category", "markup",
         "tax", "disposableFee", "price", "stock", "subsidised",
-        "isFeatured", "primaryUPC"
+        "isFeatured", "primaryUPC", "UOM", "isMeasuredInWeight"
     ]
 
     valid_products: List[ProductData] = []
@@ -115,6 +117,9 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
     total_rows: int = 0
     error_count: int = 0
     missed_categories: Set[str] = set()
+
+    # Weight identifiers to auto-flag 'isMeasuredInWeight'
+    weight_flags = ["KG", "LB", "G", "GM", "GMS", "OZ", "LBS"]
 
     try:
         with open(input_filepath, mode='r', encoding='utf-8-sig') as csvfile:
@@ -137,13 +142,13 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
                     
                     if not mapped_category:
                         mapped_category = "Other"
-                        if raw_category: # Only track it if it wasn't just blank
+                        if raw_category:
                             missed_categories.add(raw_category)
 
-                    # 2. Subsidised check based on Schema
+                    # 2. Subsidised check
                     is_subsidised = mapped_category in SUBSIDISED_CATEGORIES
 
-                    # 3. Extract Data
+                    # 3. Extract Core Data
                     try:
                         primary_upc = int(row.get('PrimaryUpc', '0'))
                     except ValueError:
@@ -152,30 +157,41 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
                     price_cents = convert_to_cents(row.get('UnitPrice', '0'))
                     disposable_fee_cents = convert_to_cents(row.get('BtlDeposit', '0'))
 
-                    # 4. Stock Status ('Active' = true, 'Deleted' = false)
+                    # 4. Stock & Price Logic
                     sts_status = row.get('STS', '').strip().upper()
                     is_in_stock = (sts_status == 'ACTIVE')
 
-                    # 5. Construct Product Mapping utilizing TypedDict
+                    # If price is 0, forcibly set stock to False
+                    if price_cents == 0:
+                        is_in_stock = False
+
+                    # 5. Extract UOM & Auto-detect Weight Measurement
+                    uom_val = row.get('UOM', '').strip()
+                    uom_upper = uom_val.upper()
+                    # If any of the weight_flags exist in the UOM string, mark it as True
+                    is_weight = any(flag in uom_upper for flag in weight_flags) if uom_val else False
+
+                    # 6. Construct Product Mapping utilizing TypedDict
                     product: ProductData = {
                         "storeId": store_id,
                         "name": name,
                         "description": row.get('ItemDesc', '').strip(),
                         "category": mapped_category,
-                        "markup": markup_percentage, # Using the value pulled from .env
+                        "markup": markup_percentage, 
                         "tax": get_tax_rate(row.get('TaxCodeName', '')),
                         "disposableFee": disposable_fee_cents if disposable_fee_cents > 0 else "",
                         "price": price_cents,
                         "stock": is_in_stock,
                         "subsidised": is_subsidised,
                         "isFeatured": False,
-                        "primaryUPC": primary_upc
+                        "primaryUPC": primary_upc,
+                        "UOM": uom_val,
+                        "isMeasuredInWeight": is_weight
                     }
 
                     valid_products.append(product)
 
                 except Exception as row_error:
-                    # Catch any unexpected row-level errors without crashing the whole script
                     print(f"⚠️ Error on row {total_rows}: {row_error}")
                     error_count += 1
 
@@ -183,7 +199,6 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
         with open(output_filepath, mode='w', encoding='utf-8', newline='') as outfile:
             writer = csv.DictWriter(outfile, fieldnames=headers)
             writer.writeheader()
-            # type ignore handles generic writer dict mapping complaint with TypedDict if older pylance version is used
             writer.writerows(valid_products) # type: ignore
 
         # --- LOGGING OUTPUT ---
@@ -209,30 +224,25 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
         print(f"❌ FATAL ERROR: {e}")
 
 if __name__ == "__main__":
-    # Load environment variables
     load_dotenv()
     
     STORE_ID = os.getenv("STORE_ID")
     MARKUP_ENV = os.getenv("MARKUP_PERCENTAGE")
     
-    # 1. Validation for STORE_ID
     if not STORE_ID:
         print("❌ ERROR: STORE_ID must be set in the .env file.")
         sys.exit(1)
         
-    # 2. Validation & Conversion for MARKUP_PERCENTAGE (converting 0.30 to 30)
     if not MARKUP_ENV:
         print("⚠️ WARNING: MARKUP_PERCENTAGE not found in .env. Defaulting to 30%.")
         markup_val = 30
     else:
         try:
-            # Convert float percentage (e.g., 0.30) to whole integer (e.g., 30)
             markup_val = int(float(MARKUP_ENV) * 100)
         except ValueError:
             print(f"⚠️ WARNING: Invalid MARKUP_PERCENTAGE format '{MARKUP_ENV}'. Defaulting to 30%.")
             markup_val = 30
 
-    # Execute script
     process_csv(
         input_filepath='csvDatatoModel/data/Item_List.csv',
         output_filepath='csvDatatoModel/data/mapped_products.csv',

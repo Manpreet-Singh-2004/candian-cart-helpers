@@ -212,3 +212,6 @@ __marimo__/
 
 # CSV Data
 /csvDatatoModel/data/
+
+# Product generated data
+products/data/
