@@ -67,7 +67,11 @@ def main():
                         "stock": parse_boolean(row.get('stock', 'True')),
                         "subsidised": parse_boolean(row.get('subsidised', 'False')),
                         "isFeatured": parse_boolean(row.get('isFeatured', 'False')),
-                        "primaryUPC": int(row['primaryUPC']) if row.get('primaryUPC') else None
+                        "primaryUPC": int(row['primaryUPC']) if row.get('primaryUPC') else None,
+                        
+                        # NEW FIELDS ADDED HERE:
+                        "UOM": row.get('UOM', '').strip() if row.get('UOM', '').strip() else None,
+                        "isMeasuredInWeight": parse_boolean(row.get('isMeasuredInWeight', 'False'))
                     }
                     documents_to_insert.append(product_doc)
                     

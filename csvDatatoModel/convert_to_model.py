@@ -1,6 +1,7 @@
 import os
 import sys
 import csv
+import re
 from typing import Dict, List, Set, TypedDict, Union
 from dotenv import load_dotenv
 
@@ -101,10 +102,41 @@ def convert_to_cents(amount_str: str) -> int:
     except (ValueError, TypeError):
         return 0
 
+def is_measured_in_weight(uom_str: str) -> bool:
+    """
+    Determines if a product is measured in weight based on its UOM string.
+    Accounts for Pieces (PC/PCS) and Volume (ML/LTR) not being weight.
+    """
+    if not uom_str:
+        return False
+    
+    uom_upper = uom_str.upper().strip()
+    
+    # 1. Explicitly filter out volume and item counts
+    non_weight_flags = ["PC", "PCS", "PIECE", "CASE", "ML", "LTR", "LTS"]
+    for flag in non_weight_flags:
+        if flag in uom_upper:
+            return False
+            
+    # Safely handle standalone "L" for Liters (e.g. "1 L", "2L" vs "LB")
+    if re.search(r'\bL\b', uom_upper) or re.search(r'\d+L\b', uom_upper):
+        return False
+
+    # 2. Check for actual weight terminology
+    weight_flags = ["KG", "LB", "LBS", "GM", "GMS", "OZ"]
+    for flag in weight_flags:
+        if flag in uom_upper:
+            return True
+            
+    # Safely handle standalone "G" for Grams (e.g. "100 G", "200G")
+    if re.search(r'\bG\b', uom_upper) or re.search(r'\d+G\b', uom_upper):
+        return True
+        
+    return False
+
 def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup_percentage: int) -> None:
     print("\n🚀 Beginning process now...")
 
-    # Matching the exact Mongoose schema fields we are pushing to CSV
     headers: List[str] = [
         "storeId", "name", "description", "category", "markup",
         "tax", "disposableFee", "price", "stock", "subsidised",
@@ -117,9 +149,6 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
     total_rows: int = 0
     error_count: int = 0
     missed_categories: Set[str] = set()
-
-    # Weight identifiers to auto-flag 'isMeasuredInWeight'
-    weight_flags = ["KG", "LB", "G", "GM", "GMS", "OZ", "LBS"]
 
     try:
         with open(input_filepath, mode='r', encoding='utf-8-sig') as csvfile:
@@ -154,22 +183,21 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
                     except ValueError:
                         primary_upc = 0
 
-                    price_cents = convert_to_cents(row.get('UnitPrice', '0'))
+                    # Utilize Cost as the primary price base
+                    cost_cents = convert_to_cents(row.get('Cost', '0'))
                     disposable_fee_cents = convert_to_cents(row.get('BtlDeposit', '0'))
 
                     # 4. Stock & Price Logic
                     sts_status = row.get('STS', '').strip().upper()
                     is_in_stock = (sts_status == 'ACTIVE')
 
-                    # If price is 0, forcibly set stock to False
-                    if price_cents == 0:
+                    # If cost is 0, forcibly set stock to False
+                    if cost_cents == 0:
                         is_in_stock = False
 
-                    # 5. Extract UOM & Auto-detect Weight Measurement
+                    # 5. Extract UOM & Use the new Regex to determine weight
                     uom_val = row.get('UOM', '').strip()
-                    uom_upper = uom_val.upper()
-                    # If any of the weight_flags exist in the UOM string, mark it as True
-                    is_weight = any(flag in uom_upper for flag in weight_flags) if uom_val else False
+                    is_weight = is_measured_in_weight(uom_val)
 
                     # 6. Construct Product Mapping utilizing TypedDict
                     product: ProductData = {
@@ -180,7 +208,7 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
                         "markup": markup_percentage, 
                         "tax": get_tax_rate(row.get('TaxCodeName', '')),
                         "disposableFee": disposable_fee_cents if disposable_fee_cents > 0 else "",
-                        "price": price_cents,
+                        "price": cost_cents, # This stores the 'Cost' mapped from the CSV
                         "stock": is_in_stock,
                         "subsidised": is_subsidised,
                         "isFeatured": False,
