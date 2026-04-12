@@ -1,12 +1,11 @@
 import os
 import sys
 import csv
-import re
 from typing import Dict, List, Set, TypedDict, Union
 from dotenv import load_dotenv
 
-# Define TypedDict to completely avoid 'Any' type
-class ProductData(TypedDict):
+
+class ProductData(TypedDict, total=False):
     storeId: str
     name: str
     description: str
@@ -22,7 +21,7 @@ class ProductData(TypedDict):
     UOM: str
     isMeasuredInWeight: bool
 
-# O(1) Dictionary for fast category mapping
+
 CATEGORY_MAP: Dict[str, str] = {
     "BEARD PRODUCTS": "Personal Care",
     "BODY SOAP": "Personal Care",
@@ -77,8 +76,8 @@ CATEGORY_MAP: Dict[str, str] = {
     "RADHE STORE": "Vegetables"
 }
 
-# Categories eligible for subsidies
 SUBSIDISED_CATEGORIES: Set[str] = {"Fruits", "Vegetables", "Dairy"}
+
 
 def get_tax_rate(tax_code_name: str) -> float:
     """Returns correct float for Tax based on string matching the Mongoose enum."""
@@ -91,7 +90,8 @@ def get_tax_rate(tax_code_name: str) -> float:
         return 0.07
     if tax in ["GST+PST", "GST + PST"]:
         return 0.12
-    return 0.0  # Captures "no" or anything else
+    return 0.0
+
 
 def convert_to_cents(amount_str: str) -> int:
     """Safely converts string price representations to integer cents."""
@@ -102,37 +102,29 @@ def convert_to_cents(amount_str: str) -> int:
     except (ValueError, TypeError):
         return 0
 
-def is_measured_in_weight(uom_str: str) -> bool:
+
+def get_valid_weight_uom(uom_str: str) -> str:
     """
-    Determines if a product is measured in weight based on its UOM string.
-    Accounts for Pieces (PC/PCS) and Volume (ML/LTR) not being weight.
+    Returns a valid weight UOM only if the value is exactly a weight unit.
+    Rejects values like '2 KG', '500 G', '1 LB', '12 PCS', '1 LTR', etc.
     """
     if not uom_str:
-        return False
-    
-    uom_upper = uom_str.upper().strip()
-    
-    # 1. Explicitly filter out volume and item counts
-    non_weight_flags = ["PC", "PCS", "PIECE", "CASE", "ML", "LTR", "LTS"]
-    for flag in non_weight_flags:
-        if flag in uom_upper:
-            return False
-            
-    # Safely handle standalone "L" for Liters (e.g. "1 L", "2L" vs "LB")
-    if re.search(r'\bL\b', uom_upper) or re.search(r'\d+L\b', uom_upper):
-        return False
+        return ""
 
-    # 2. Check for actual weight terminology
-    weight_flags = ["KG", "LB", "LBS", "GM", "GMS", "OZ"]
-    for flag in weight_flags:
-        if flag in uom_upper:
-            return True
-            
-    # Safely handle standalone "G" for Grams (e.g. "100 G", "200G")
-    if re.search(r'\bG\b', uom_upper) or re.search(r'\d+G\b', uom_upper):
-        return True
-        
-    return False
+    uom_upper = uom_str.upper().strip()
+
+    valid_weight_units = {
+        "KG": "KG",
+        "LB": "LB",
+        "LBS": "LB",
+        "G": "G",
+        "GM": "G",
+        "GMS": "G",
+        "OZ": "OZ"
+    }
+
+    return valid_weight_units.get(uom_upper, "")
+
 
 def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup_percentage: int) -> None:
     print("\n🚀 Beginning process now...")
@@ -145,7 +137,6 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
 
     valid_products: List[ProductData] = []
 
-    # Tracking metrics
     total_rows: int = 0
     error_count: int = 0
     missed_categories: Set[str] = set()
@@ -160,62 +151,58 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
                 try:
                     name = row.get('ItemName', '').strip()
 
-                    # Early exit if there is no name
                     if not name:
                         error_count += 1
                         continue
 
-                    # 1. Category Mapping Tracking
                     raw_category = row.get('CategoryName', '').strip()
                     mapped_category = CATEGORY_MAP.get(raw_category.upper())
-                    
+
                     if not mapped_category:
                         mapped_category = "Other"
                         if raw_category:
                             missed_categories.add(raw_category)
 
-                    # 2. Subsidised check
                     is_subsidised = mapped_category in SUBSIDISED_CATEGORIES
 
-                    # 3. Extract Core Data
                     try:
                         primary_upc = int(row.get('PrimaryUpc', '0'))
                     except ValueError:
                         primary_upc = 0
 
-                    # Utilize Cost as the primary price base
                     cost_cents = convert_to_cents(row.get('Cost', '0'))
                     disposable_fee_cents = convert_to_cents(row.get('BtlDeposit', '0'))
 
-                    # 4. Stock & Price Logic
                     sts_status = row.get('STS', '').strip().upper()
                     is_in_stock = (sts_status == 'ACTIVE')
 
-                    # If cost is 0, forcibly set stock to False
+                    # If cost is 0, force stock to False
                     if cost_cents == 0:
                         is_in_stock = False
 
-                    # 5. Extract UOM & Use the new Regex to determine weight
-                    uom_val = row.get('UOM', '').strip()
-                    is_weight = is_measured_in_weight(uom_val)
+                    raw_uom = row.get('UOM', '').strip()
+                    valid_uom = get_valid_weight_uom(raw_uom)
 
-                    # 6. Construct Product Mapping utilizing TypedDict
                     product: ProductData = {
                         "storeId": store_id,
                         "name": name,
                         "description": row.get('ItemDesc', '').strip(),
                         "category": mapped_category,
-                        "markup": markup_percentage, 
+                        "markup": markup_percentage,
                         "tax": get_tax_rate(row.get('TaxCodeName', '')),
                         "disposableFee": disposable_fee_cents if disposable_fee_cents > 0 else "",
-                        "price": cost_cents, # This stores the 'Cost' mapped from the CSV
+                        "price": cost_cents,
                         "stock": is_in_stock,
                         "subsidised": is_subsidised,
                         "isFeatured": False,
-                        "primaryUPC": primary_upc,
-                        "UOM": uom_val,
-                        "isMeasuredInWeight": is_weight
+                        "primaryUPC": primary_upc
                     }
+
+                    # Only include UOM and isMeasuredInWeight
+                    # when the UOM value is exactly a valid weight unit
+                    if valid_uom:
+                        product["UOM"] = valid_uom
+                        product["isMeasuredInWeight"] = True
 
                     valid_products.append(product)
 
@@ -223,13 +210,11 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
                     print(f"⚠️ Error on row {total_rows}: {row_error}")
                     error_count += 1
 
-        # Write output to CSV
         with open(output_filepath, mode='w', encoding='utf-8', newline='') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=headers)
+            writer = csv.DictWriter(outfile, fieldnames=headers, extrasaction='ignore')
             writer.writeheader()
-            writer.writerows(valid_products) # type: ignore
+            writer.writerows(valid_products)
 
-        # --- LOGGING OUTPUT ---
         print("-" * 40)
         print("📊 Processing Summary:")
         print(f"  Total entities found:       {total_rows}")
@@ -251,16 +236,17 @@ def process_csv(input_filepath: str, output_filepath: str, store_id: str, markup
     except Exception as e:
         print(f"❌ FATAL ERROR: {e}")
 
+
 if __name__ == "__main__":
     load_dotenv()
-    
+
     STORE_ID = os.getenv("STORE_ID")
     MARKUP_ENV = os.getenv("MARKUP_PERCENTAGE")
-    
+
     if not STORE_ID:
         print("❌ ERROR: STORE_ID must be set in the .env file.")
         sys.exit(1)
-        
+
     if not MARKUP_ENV:
         print("⚠️ WARNING: MARKUP_PERCENTAGE not found in .env. Defaulting to 30%.")
         markup_val = 30
