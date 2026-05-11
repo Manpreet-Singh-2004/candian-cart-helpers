@@ -210,6 +210,9 @@ __marimo__/
 # backups Folder
 /backups/
 
+# all data folders
+data*/
+
 # CSV Data
 /csvDatatoModel/data/
 
