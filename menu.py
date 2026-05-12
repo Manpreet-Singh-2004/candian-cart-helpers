@@ -24,11 +24,12 @@ def products_menu():
         print("\n--- Products Menu ---")
         print("1. Add Products (Random hardcoded data)")
         print("2. Delete Products")
-        print("3. Process CSV Data to Mapped Products")
-        print("4. Bulk Add Products from Mapped CSV")
-        print("5. Go Back to Main Menu")
+        print("3. Process CSV Data to Mapped Products (Generic)")
+        print("4. Process Sunfarm CSV Data to Mapped Products")
+        print("5. Bulk Add Products from Mapped CSV")
+        print("6. Go Back to Main Menu")
         
-        choice = input("\nEnter your choice (1-5): ").strip()
+        choice = input("\nEnter your choice (1-6): ").strip()
         
         if choice == '1':
             run_script(os.path.join("products", "AddProducts.py"))
@@ -37,12 +38,14 @@ def products_menu():
         elif choice == '3':
             run_script(os.path.join("csvDatatoModel", "convert_to_model.py"))
         elif choice == '4':
-            # Run the new bulk import script
-            run_script(os.path.join("csvDatatoModel", "BulkAddProducts.py"))
+            # This points directly to the newly fixed Sunfarm script
+            run_script(os.path.join("csvDatatoModel", "sunfarm", "convertToModel.py"))
         elif choice == '5':
+            run_script(os.path.join("csvDatatoModel", "BulkAddProducts.py"))
+        elif choice == '6':
             break
         else:
-            print("\n[!] Invalid choice. Please select 1, 2, 3, 4, or 5.")
+            print("\n[!] Invalid choice. Please select 1 through 6.")
 
 def dbBackup_menu():
     """Sub-menu for database backup options."""
@@ -102,7 +105,7 @@ def main():
         print("1. DB Backup")
         print("2. Manage Products")
         print("3. Manage Customers")
-        print("4. Manage Orders")  # Linked the orders menu here!
+        print("4. Manage Orders")  
         print("5. Exit")
         
         choice = input("\nEnter your choice (1-5): ").strip()
