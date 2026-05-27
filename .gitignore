@@ -218,3 +218,13 @@ data*/
 
 # Product generated data
 products/data/
+
+# Sunfarm backups
+/Sunfarm/Backups/dev
+/Sunfarm/Backups/prod
+
+# Products
+/Sunfarm/Products/Finalized/
+/Sunfarm/Products/original/
+/Sunfarm/Products/temp/
+/Sunfarm/Products/WorkingOnCurrently

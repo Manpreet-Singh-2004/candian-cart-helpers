@@ -47,3 +47,19 @@ and then run
 ```bash
  python menu.py
 ```
+
+# Management
+
+## Backups
+
+Sunfarm backups will be done within the `/Sunfarm/Backups/` folder and based on what DB dev or prod
+
+## Product
+
+When working on products for eg **Sunfarm** work on `/Sunfarm/Products/WorkingOnCurrently` they must only contain the files like json or csv or so on, No Code. All the Coding files have to be created in code folder `/Sunfarm/Products/WorkingOnCurrently`.
+
+original folder contains the base original product csv we recieved and in short the biggest list of products.
+
+Finalized contains the final csv or json to be inserted
+
+temp has temp files which maybe a mix of things
