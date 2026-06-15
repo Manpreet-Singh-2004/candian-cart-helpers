@@ -228,3 +228,7 @@ products/data/
 /Sunfarm/Products/original/
 /Sunfarm/Products/temp/
 /Sunfarm/Products/WorkingOnCurrently
+
+# Temps folders
+/temp/
+/temp2/
