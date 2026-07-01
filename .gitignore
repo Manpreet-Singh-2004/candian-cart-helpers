@@ -229,6 +229,9 @@ products/data/
 /Sunfarm/Products/temp/
 /Sunfarm/Products/WorkingOnCurrently
 
+# Customer data
+/Customers/data/
+
 # Temps folders
 /temp/
 /temp2/
